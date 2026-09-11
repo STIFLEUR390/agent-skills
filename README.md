@@ -78,6 +78,13 @@ done
 | Pi | `~/.pi/agent/skills/` | `/skill:skill-name` |
 | omp | `~/.omp/agent/skills/` | `/skill:skill-name` |
 
+## Documentation
+
+| Skill | Guide |
+|-------|-------|
+| project-definer | [docs/project-definer/GUIDE.md](docs/project-definer/GUIDE.md) |
+| skill-creator | [docs/skill-creator/GUIDE.md](docs/skill-creator/GUIDE.md) |
+
 ## Contribuer
 
 1. Créer le skill avec `skill-creator` ou manuellement
