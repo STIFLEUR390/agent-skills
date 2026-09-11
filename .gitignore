@@ -12,3 +12,16 @@ Thumbs.db
 # Temp
 *.tmp
 *.bak
+
+# Installed skills (npx skills add)
+.agents/
+.claude/
+agent/
+skills/janitor-*/
+skills/janitor-discover
+skills/janitor-fix
+skills/janitor-report
+skills/janitor-security
+skills/janitor-swipe
+skills/janitor-value
+skills-lock.json

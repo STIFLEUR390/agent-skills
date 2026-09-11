@@ -40,6 +40,15 @@ bash scripts/health-check.sh --dupes
 
 # JSON pour pipeline
 bash scripts/health-check.sh --json
+
+# Lint frontmatter
+bash scripts/health-check.sh --lint
+
+# Auto-fix (dry-run)
+bash scripts/health-check.sh --fix
+
+# Auto-fix (appliquer)
+bash scripts/health-check.sh --fix --apply
 ```
 
 ## Options
@@ -51,6 +60,9 @@ bash scripts/health-check.sh --json
 | `--security` | Scan sécurité seul |
 | `--tokens` | Estimation coût token seul |
 | `--dupes` | Détection doublons seul |
+| `--lint` | Lint frontmatter (quality checks) |
+| `--fix` | Auto-fix commun (dry-run par défaut) |
+| `--apply` | Appliquer les fixes (avec `--fix`) |
 | `--scope user` | Skills utilisateur uniquement |
 | `--scope project` | Skills projet uniquement |
 | `--scope all` | Tous les scopes (défaut) |
@@ -190,6 +202,31 @@ slideshow                           .agents, .claude, agent   8396
   [100%] generate-git-commit <-> git-helper
        Scopes: user / user
 ```
+
+## Lint frontmatter
+
+Vérifie la qualité de chaque SKILL.md :
+
+| Sévérité | Vérification |
+|----------|-------------|
+| CRITICAL | Frontmatter manquant ou cassé |
+| CRITICAL | Description absente (agent ne peut pas déclencher) |
+| WARNING | Description trop courte (< 30 chars) |
+| WARNING | Pas de mot de déclenchement ("Use when...") |
+| WARNING | Body trop court (< 3 lignes) |
+| INFO | Description trop longue (> 500 chars) |
+| INFO | Pas de section Gotchas |
+| INFO | Fichier trop gros (> 500 lignes) |
+| INFO | Le nom du dossier ne correspond pas au champ `name` |
+
+## Auto-fix
+
+Corrections automatiques (dry-run par défaut, `--apply` pour écrire) :
+- Ajout du closing `---` manquant dans le frontmatter
+- Ajout d'une description template si absente
+- Ajout de `metadata.version: "1.0.0"` si absent
+
+Ne touche PAS : les skills plugin/marketplace, les liens brisés, les fichiers sans SKILL.md.
 
 ## Différence avec skills-janitor
 

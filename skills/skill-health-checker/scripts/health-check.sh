@@ -9,6 +9,9 @@
 #   health-check.sh --security       # Security scan only
 #   health-check.sh --tokens         # Token estimate only
 #   health-check.sh --dupes          # Duplicate detection only
+#   health-check.sh --lint           # Frontmatter lint checks
+#   health-check.sh --fix            # Auto-fix common issues (dry-run)
+#   health-check.sh --fix --apply    # Apply fixes
 #   health-check.sh --scope user     # User-scope only
 #   health-check.sh --scope project  # Project-scope only
 
@@ -22,6 +25,9 @@ JSON_OUTPUT=false
 SECURITY_ONLY=false
 TOKENS_ONLY=false
 DUPES_ONLY=false
+LINT_ONLY=false
+FIX_MODE=false
+FIX_APPLY=false
 SCOPE="all"
 BUDGET=200000
 
@@ -32,6 +38,9 @@ while [[ $# -gt 0 ]]; do
     --security)  SECURITY_ONLY=true; shift ;;
     --tokens)    TOKENS_ONLY=true; shift ;;
     --dupes)     DUPES_ONLY=true; shift ;;
+    --lint)      LINT_ONLY=true; shift ;;
+    --fix)       FIX_MODE=true; shift ;;
+    --apply)     FIX_APPLY=true; shift ;;
     --scope)     SCOPE="$2"; shift 2 ;;
     --budget)    BUDGET="$2"; shift 2 ;;
     -h|--help)
@@ -133,7 +142,7 @@ fi
 # ────────────────────────────────────────────────────────────────────────────
 # Run analysis in Python
 # ────────────────────────────────────────────────────────────────────────────
-export SKILLS_TSV BUDGET BRIEF JSON_OUTPUT SECURITY_ONLY TOKENS_ONLY DUPES_ONLY
+export SKILLS_TSV BUDGET BRIEF JSON_OUTPUT SECURITY_ONLY TOKENS_ONLY DUPES_ONLY LINT_ONLY FIX_MODE FIX_APPLY
 
 python3 << 'PYEOF'
 import base64
@@ -151,6 +160,9 @@ JSON_OUTPUT = os.environ.get("JSON_OUTPUT", "false") == "true"
 SECURITY_ONLY = os.environ.get("SECURITY_ONLY", "false") == "true"
 TOKENS_ONLY = os.environ.get("TOKENS_ONLY", "false") == "true"
 DUPES_ONLY = os.environ.get("DUPES_ONLY", "false") == "true"
+LINT_ONLY = os.environ.get("LINT_ONLY", "false") == "true"
+FIX_MODE = os.environ.get("FIX_MODE", "false") == "true"
+FIX_APPLY = os.environ.get("FIX_APPLY", "false") == "true"
 
 # ─── Load skills ────────────────────────────────────────────────────────────
 skills_raw = []
@@ -440,6 +452,239 @@ if not TOKENS_ONLY and not DUPES_ONLY:
     for s in analyzed:
         s["security_findings"] = security_scan(s)
 
+# ─── Lint checks (frontmatter quality) ─────────────────────────────────────
+def lint_skill(skill_info):
+    """Check SKILL.md frontmatter quality. Returns list of {severity, message}."""
+    findings = []
+    path = skill_info["path"]
+    name = skill_info["name"]
+
+    # Broken symlink
+    if skill_info["symlink_broken"]:
+        target = os.readlink(path) if os.path.islink(path) else "?"
+        findings.append({"severity": "critical", "message": f"Broken symlink -> {target}"})
+        return findings
+
+    # Find SKILL.md
+    skill_file = None
+    for candidate in ["SKILL.md", "Skill.md"]:
+        p = os.path.join(path, candidate)
+        if os.path.isfile(p):
+            skill_file = p
+            break
+
+    if not skill_file:
+        return findings  # no SKILL.md = support folder, skip silently
+
+    try:
+        with open(skill_file, encoding="utf-8", errors="replace") as f:
+            content = f.read()
+    except OSError:
+        return findings
+
+    lines = content.split("\n")
+
+    # Missing frontmatter
+    if not lines or lines[0].strip() != "---":
+        findings.append({"severity": "critical", "message": "Missing frontmatter (no opening ---)"})
+        return findings
+
+    # Find closing ---
+    fm_close = 0
+    for i in range(1, len(lines)):
+        if lines[i].strip() == "---":
+            fm_close = i
+            break
+    if fm_close == 0:
+        findings.append({"severity": "critical", "message": "Missing closing --- in frontmatter"})
+        return findings
+
+    fm_lines = lines[1:fm_close]
+    frontmatter = "\n".join(fm_lines)
+
+    # Name field
+    name_field = ""
+    for line in fm_lines:
+        if line.startswith("name:"):
+            name_field = line.split("name:", 1)[1].strip().strip('"').strip("'")
+            break
+    if not name_field:
+        findings.append({"severity": "warning", "message": "Missing 'name' field in frontmatter"})
+    elif name_field.lower() != name.lower() and name_field.replace(" ", "-").lower() != name.lower():
+        findings.append({"severity": "info", "message": f"Folder name '{name}' doesn't match skill name '{name_field}'"})
+
+    # Description field
+    desc_raw = ""
+    for line in fm_lines:
+        if line.startswith("description:"):
+            desc_raw = line.split("description:", 1)[1].strip().strip('"').strip("'")
+            break
+
+    # Block scalar
+    desc = ""
+    if not desc_raw or re.match(r'^[|>][-+]?[0-9]*$', desc_raw) or re.match(r'^[|>][0-9]*[-+]?$', desc_raw):
+        capture = False
+        for line in fm_lines:
+            if line.startswith("description:"):
+                capture = True
+                continue
+            if capture and (line.startswith("  ") or line.startswith("\t")):
+                desc += line.strip() + " "
+            elif capture:
+                break
+        desc = desc.strip()
+    else:
+        desc = desc_raw
+
+    if not desc:
+        findings.append({"severity": "critical", "message": "Missing 'description' field - agent can't trigger this skill"})
+    else:
+        desc_len = len(desc)
+        if desc_len < 30:
+            findings.append({"severity": "warning", "message": f"Description too short ({desc_len} chars) - should be 50-200 for good triggering"})
+        elif desc_len > 500:
+            findings.append({"severity": "info", "message": f"Description is long ({desc_len} chars) - consider trimming to < 300"})
+
+        # Trigger word check
+        if not re.search(r'(when|trigger|use for|invoke|mention|says|asks|also use|use this|relevant|appropriate|helps with|designed for)', desc, re.I):
+            findings.append({"severity": "warning", "message": "Description doesn't explain when to trigger - add 'Use when...' or 'Also use when...'"})
+
+    # Body content
+    body_lines = 0
+    for line in lines[fm_close + 1:]:
+        if line.strip():
+            body_lines += 1
+    if body_lines < 3:
+        findings.append({"severity": "warning", "message": f"Very little body content ({body_lines} non-empty lines)"})
+
+    # Gotchas section
+    if not re.search(r'gotcha', content, re.I):
+        findings.append({"severity": "info", "message": "No Gotchas section - consider adding common pitfalls"})
+
+    # Total size
+    total_lines = len([l for l in lines if l.strip()])
+    if total_lines > 500:
+        findings.append({"severity": "info", "message": f"Skill file is large ({total_lines} lines) - consider progressive disclosure"})
+
+    return findings
+
+if not TOKENS_ONLY and not DUPES_ONLY and not SECURITY_ONLY:
+    for s in analyzed:
+        s["lint_findings"] = lint_skill(s)
+
+# ─── Auto-fix common issues ────────────────────────────────────────────────
+def fix_skill(skill_info):
+    """Fix common frontmatter issues. Returns list of actions taken."""
+    actions = []
+    path = skill_info["path"]
+    name = skill_info["name"]
+
+    # Skip broken symlinks, plugin/marketplace skills
+    if skill_info["symlink_broken"]:
+        return actions
+    if any(loc["scope"] in ("plugin", "source") for loc in skill_info["locations"]):
+        return actions
+
+    skill_file = None
+    for candidate in ["SKILL.md", "Skill.md"]:
+        p = os.path.join(path, candidate)
+        if os.path.isfile(p):
+            skill_file = p
+            break
+    if not skill_file:
+        return actions
+
+    try:
+        with open(skill_file, encoding="utf-8", errors="replace") as f:
+            content = f.read()
+    except OSError:
+        return actions
+
+    original = content
+    lines = content.split("\n")
+
+    # Fix 1: Add missing opening frontmatter
+    if not lines or lines[0].strip() != "---":
+        if re.search(r'^(name|description):', content, re.M):
+            content = "---\n" + content
+            lines = content.split("\n")
+            actions.append("Added missing opening ---")
+
+    # Re-find closing ---
+    fm_close = 0
+    for i in range(1, len(lines)):
+        if lines[i].strip() == "---":
+            fm_close = i
+            break
+
+    if fm_close == 0 and lines and lines[0].strip() == "---":
+        # Find where frontmatter-like content ends
+        last_key_line = 0
+        for i in range(1, len(lines)):
+            if re.match(r'^[a-zA-Z_-]+:', lines[i]):
+                last_key_line = i
+            elif lines[i].strip() == "" or lines[i].startswith("  ") or lines[i].startswith("\t"):
+                continue
+            else:
+                break
+        if last_key_line > 0:
+            lines.insert(last_key_line + 1, "---")
+            content = "\n".join(lines)
+            actions.append("Added missing closing ---")
+
+    # Re-find closing --- after potential fix
+    lines = content.split("\n")
+    fm_close = 0
+    for i in range(1, len(lines)):
+        if lines[i].strip() == "---":
+            fm_close = i
+            break
+
+    if fm_close == 0:
+        return actions
+
+    fm_lines = lines[1:fm_close]
+
+    # Fix 2: Add missing description
+    has_desc = any(l.startswith("description:") for l in fm_lines)
+    if not has_desc:
+        desc_template = f'description: "Use when the user wants to use {name}. Add specific trigger phrases here."'
+        # Insert after name field or at start
+        inserted = False
+        for i, line in enumerate(fm_lines):
+            if line.startswith("name:"):
+                fm_lines.insert(i + 1, desc_template)
+                inserted = True
+                break
+        if not inserted:
+            fm_lines.insert(0, desc_template)
+        content = "\n".join([lines[0]] + fm_lines + lines[fm_close:])
+        actions.append("Added template description field")
+
+    # Fix 3: Add missing version field
+    has_version = any(re.match(r'^\s*version:', l) for l in fm_lines)
+    has_metadata = any(l.startswith("metadata:") for l in fm_lines)
+    if not has_version and not has_metadata:
+        # Find anchor (name or description)
+        for i, line in enumerate(fm_lines):
+            if line.startswith("description:") or line.startswith("name:"):
+                fm_lines.insert(i + 1, "metadata:")
+                fm_lines.insert(i + 2, '  version: "1.0.0"')
+                content = "\n".join([lines[0]] + fm_lines + lines[fm_close:])
+                actions.append("Added metadata.version field")
+                break
+
+    if actions and content != original:
+        if FIX_APPLY:
+            with open(skill_file, "w", encoding="utf-8") as f:
+                f.write(content)
+
+    return actions
+
+if FIX_MODE and not TOKENS_ONLY and not DUPES_ONLY and not SECURITY_ONLY:
+    for s in analyzed:
+        s["fix_actions"] = fix_skill(s)
+
 # ─── Duplicate detection ────────────────────────────────────────────────────
 def find_dupes(skills_list):
     # Name collisions — same name in different realpaths
@@ -588,6 +833,53 @@ if DUPES_ONLY:
         print("No duplicates detected.")
     sys.exit(0)
 
+# ─── Lint output ───────────────────────────────────────────────────────────
+if LINT_ONLY:
+    linted = [s for s in analyzed if s.get("lint_findings")]
+    crit = sum(1 for s in linted for f in s["lint_findings"] if f["severity"] == "critical")
+    warn = sum(1 for s in linted for f in s["lint_findings"] if f["severity"] == "warning")
+    info = sum(1 for s in linted for f in s["lint_findings"] if f["severity"] == "info")
+
+    print("=== Lint Report ===")
+    print(f"Scanned: {len(analyzed)} unique skills")
+    print(f"Critical: {crit} | Warning: {warn} | Info: {info}")
+    print()
+
+    for s in sorted(linted, key=lambda x: ({"critical": 0, "warning": 1, "info": 2}[x["lint_findings"][0]["severity"]], x["name"])):
+        agents_str = locs_str(s)
+        for f in s["lint_findings"]:
+            sev = f["severity"].upper()
+            print(f"  [{sev:<8}] {s['qualified']} ({agents_str}): {f['message']}")
+    print()
+
+    if crit == 0 and warn == 0:
+        print("All skills pass lint checks.")
+    sys.exit(0)
+
+# ─── Fix output ─────────────────────────────────────────────────────────────
+if FIX_MODE:
+    fixed = [s for s in analyzed if s.get("fix_actions")]
+    mode_label = "APPLY" if FIX_APPLY else "DRY RUN"
+
+    print(f"=== Auto-Fix ({mode_label}) ===")
+    print(f"Scanned: {len(analyzed)} unique skills")
+    print()
+
+    if not fixed:
+        print("Nothing to fix.")
+        sys.exit(0)
+
+    for s in fixed:
+        agents_str = locs_str(s)
+        for action in s["fix_actions"]:
+            prefix = "[FIXED]" if FIX_APPLY else "[DRY RUN]"
+            print(f"  {prefix} {s['qualified']} ({agents_str}): {action}")
+    print()
+    print(f"Total: {len(fixed)} skills with fixes")
+    if not FIX_APPLY:
+        print("Run with --apply to write changes.")
+    sys.exit(0)
+
 # ─── Full report ────────────────────────────────────────────────────────────
 total_locations = sum(len(s["locations"]) for s in analyzed)
 print("=== Skill Health Checker ===")
@@ -651,6 +943,28 @@ if risk_skills or review_skills:
 elif not TOKENS_ONLY:
     print("--- Security: All clear ---")
     print()
+
+# --- Lint ---
+if not TOKENS_ONLY:
+    linted = [(s, s.get("lint_findings", [])) for s in analyzed]
+    linted = [(s, f) for s, f in linted if f]
+    lint_crit = sum(1 for _, f in linted for x in f if x["severity"] == "critical")
+    lint_warn = sum(1 for _, f in linted for x in f if x["severity"] == "warning")
+    lint_info = sum(1 for _, f in linted for x in f if x["severity"] == "info")
+    if linted:
+        print(f"--- Lint ({lint_crit} critical, {lint_warn} warning, {lint_info} info) ---")
+        for s, findings in sorted(linted, key=lambda x: ({"critical": 0, "warning": 1, "info": 2}[x[1][0]["severity"]], x[0]["name"]))[:10]:
+            agents_str = locs_str(s)
+            for f in findings:
+                sev = f["severity"].upper()
+                print(f"  [{sev:<8}] {s['qualified']} ({agents_str}): {f['message']}")
+        remaining = len(linted) - 10
+        if remaining > 0:
+            print(f"  ... and {remaining} more skills with findings")
+        print()
+    elif not TOKENS_ONLY:
+        print("--- Lint: All clean ---")
+        print()
 
 # --- Tokens ---
 print("--- Token Cost ---")

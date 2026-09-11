@@ -87,7 +87,7 @@ bash scripts/health-check.sh --scope all      # tout (défaut)
 ### Scan sécurité seul
 
 ```bash
-bash scripts/health-check.sh --security
+bash scripts/health-checker.sh --security
 ```
 
 ### Estimation tokens seul
@@ -101,6 +101,28 @@ bash scripts/health-check.sh --tokens
 ```bash
 bash scripts/health-check.sh --dupes
 ```
+
+### Lint frontmatter
+
+```bash
+# Vérifier la qualité des frontmatters (critical/warning/info)
+bash scripts/health-check.sh --lint
+```
+
+### Auto-fix
+
+```bash
+# Dry-run : voir ce qui serait corrigé
+bash scripts/health-check.sh --fix
+
+# Appliquer les corrections
+bash scripts/health-check.sh --fix --apply
+```
+
+Corrections auto-appliquées :
+- Ajout du closing `---` manquant
+- Ajout d'une description template si absente
+- Ajout de `metadata.version: "1.0.0"` si absent
 
 ## Ce que le rapport contient
 
@@ -140,6 +162,7 @@ Verdicts : PASS / REVIEW / RISK
 - [ ] Rapport affiché sans erreur
 - [ ] `RISK` vérifiés manuellement
 - [ ] `Broken symlinks` nettoyés
+- [ ] `CRITICAL` lint corrigés (`--fix --apply`)
 - [ ] Skills inutiles supprimés ou désactivés
 - [ ] Budget token < 100% (sinon, réduire les skills ou augmenter le contexte)
 
