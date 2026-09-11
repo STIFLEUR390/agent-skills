@@ -21,6 +21,7 @@ npx skills add STIFLEUR390/agent-skills --skill project-definer -a claude-code
 |-------|-------------|-------|
 | [project-definer](skills/project-definer/) | Définition complète d'un projet : découverte, cahier des charges, PRD, architecture, rôles/permissions, isolation, paiements | Lancer un nouveau projet |
 | [skill-creator](skills/skill-creator/) | Créer un nouveau skill agent multi-plateforme avec les bonnes pratiques | Ajouter un skill au repo |
+| [skill-health-checker](skills/skill-health-checker/) | Auditer tous les skills installés : inventaire, sécurité, tokens, doublons cross-agents | Vérifier l'état de santé des skills |
 
 ## Développement
 
@@ -42,17 +43,21 @@ bash skills/skill-creator/scripts/deploy.sh mon-skill
 
 ```
 skills/
-├── project-definer/     # Définition de projet
+├── project-definer/        # Définition de projet
 │   ├── SKILL.md
 │   ├── workflows/
 │   ├── templates/
 │   ├── references/
 │   └── scripts/
-├── skill-creator/       # Création de skills
+├── skill-creator/          # Création de skills
 │   ├── SKILL.md
 │   ├── templates/
 │   ├── references/
 │   └── scripts/
+├── skill-health-checker/   # Audit multi-agents
+│   ├── SKILL.md
+│   ├── scripts/
+│   └── references/
 └── [prochain-skill]/
 ```
 
@@ -84,6 +89,7 @@ done
 |-------|-------|
 | project-definer | [docs/project-definer/GUIDE.md](docs/project-definer/GUIDE.md) |
 | skill-creator | [docs/skill-creator/GUIDE.md](docs/skill-creator/GUIDE.md) |
+| skill-health-checker | [docs/skill-health-checker/GUIDE.md](docs/skill-health-checker/GUIDE.md) |
 
 ## Contribuer
 
@@ -91,7 +97,8 @@ done
 2. Valider : `bash skills/skill-creator/scripts/validate.sh skills/<name>`
 3. Déployer : `bash skills/skill-creator/scripts/deploy.sh <name>`
 4. Ajouter la doc dans `docs/<name>/GUIDE.md`
-5. Push
+5. Audit santé : `bash skills/skill-health-checker/scripts/health-check.sh`
+6. Push
 
 ## License
 
