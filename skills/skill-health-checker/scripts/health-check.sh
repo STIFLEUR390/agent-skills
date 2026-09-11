@@ -28,6 +28,9 @@ DUPES_ONLY=false
 LINT_ONLY=false
 FIX_MODE=false
 FIX_APPLY=false
+AUDIT_MODE=false
+AUDIT_ALL=false
+AUDIT_TOKEN=""
 SCOPE="all"
 BUDGET=200000
 
@@ -41,6 +44,9 @@ while [[ $# -gt 0 ]]; do
     --lint)      LINT_ONLY=true; shift ;;
     --fix)       FIX_MODE=true; shift ;;
     --apply)     FIX_APPLY=true; shift ;;
+    --audit)     AUDIT_MODE=true; shift ;;
+    --audit-all) AUDIT_MODE=true; AUDIT_ALL=true; shift ;;
+    --token)     AUDIT_TOKEN="$2"; shift 2 ;;
     --scope)     SCOPE="$2"; shift 2 ;;
     --budget)    BUDGET="$2"; shift 2 ;;
     -h|--help)
@@ -142,7 +148,7 @@ fi
 # ────────────────────────────────────────────────────────────────────────────
 # Run analysis in Python
 # ────────────────────────────────────────────────────────────────────────────
-export SKILLS_TSV BUDGET BRIEF JSON_OUTPUT SECURITY_ONLY TOKENS_ONLY DUPES_ONLY LINT_ONLY FIX_MODE FIX_APPLY
+export SKILLS_TSV BUDGET BRIEF JSON_OUTPUT SECURITY_ONLY TOKENS_ONLY DUPES_ONLY LINT_ONLY FIX_MODE FIX_APPLY AUDIT_MODE AUDIT_ALL AUDIT_TOKEN
 
 python3 << 'PYEOF'
 import base64
@@ -163,6 +169,9 @@ DUPES_ONLY = os.environ.get("DUPES_ONLY", "false") == "true"
 LINT_ONLY = os.environ.get("LINT_ONLY", "false") == "true"
 FIX_MODE = os.environ.get("FIX_MODE", "false") == "true"
 FIX_APPLY = os.environ.get("FIX_APPLY", "false") == "true"
+AUDIT_MODE = os.environ.get("AUDIT_MODE", "false") == "true"
+AUDIT_ALL = os.environ.get("AUDIT_ALL", "false") == "true"
+AUDIT_TOKEN = os.environ.get("AUDIT_TOKEN", "")
 
 # ─── Load skills ────────────────────────────────────────────────────────────
 skills_raw = []
@@ -685,6 +694,79 @@ if FIX_MODE and not TOKENS_ONLY and not DUPES_ONLY and not SECURITY_ONLY:
     for s in analyzed:
         s["fix_actions"] = fix_skill(s)
 
+# ─── Audit via skills.sh API ───────────────────────────────────────────────
+def audit_skill(skill_info):
+    """Query skills.sh API for security audit results. Requires --token or VERCEL_OIDC_TOKEN."""
+    import urllib.request
+    import urllib.error
+
+    token = AUDIT_TOKEN or os.environ.get("VERCEL_OIDC_TOKEN", "")
+    if not token:
+        return {"error": "auth_required"}
+
+    name = skill_info["name"]
+    try:
+        url = f"https://skills.sh/api/v1/skills/search?q={name}&limit=5"
+        req = urllib.request.Request(url, headers={
+            "User-Agent": "skill-health-checker/1.0",
+            "Authorization": f"Bearer {token}",
+        })
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+    except Exception:
+        return None
+
+    results = data.get("data", [])
+    if not results:
+        return None
+
+    # Find exact match
+    match = None
+    for r in results:
+        if r.get("slug", "").lower() == name.lower() or r.get("name", "").lower() == name.lower():
+            match = r
+            break
+    if not match:
+        match = results[0]
+
+    skill_id = match.get("id", "")
+    installs = match.get("installs", 0)
+    is_dup = match.get("isDuplicate", False)
+
+    # Get audit results
+    audits = []
+    if skill_id:
+        try:
+            audit_url = f"https://skills.sh/api/v1/skills/audit/{skill_id}"
+            req = urllib.request.Request(audit_url, headers={"User-Agent": "skill-health-checker/1.0"})
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                audit_data = json.loads(resp.read())
+                audits = audit_data.get("audits", [])
+        except urllib.error.HTTPError:
+            pass
+        except Exception:
+            pass
+
+    return {
+        "skill_id": skill_id,
+        "installs": installs,
+        "is_duplicate": is_dup,
+        "audits": audits,
+        "url": match.get("url", ""),
+    }
+
+if AUDIT_MODE:
+    # By default, only audit our own skills (fast). --audit-all checks everything.
+    OWN_SKILLS = {"project-definer", "skill-creator", "skill-health-checker"}
+    for s in analyzed:
+        if s["symlink_broken"]:
+            continue
+        if any(loc["scope"] in ("plugin", "source") for loc in s["locations"]):
+            continue
+        if not AUDIT_ALL and s["name"] not in OWN_SKILLS:
+            continue
+        s["audit_result"] = audit_skill(s)
+
 # ─── Duplicate detection ────────────────────────────────────────────────────
 def find_dupes(skills_list):
     # Name collisions — same name in different realpaths
@@ -833,6 +915,57 @@ if DUPES_ONLY:
         print("No duplicates detected.")
     sys.exit(0)
 
+# ─── Audit output ─────────────────────────────────────────────────────────
+if AUDIT_MODE:
+    # Check if auth is available
+    has_auth = bool(AUDIT_TOKEN or os.environ.get("VERCEL_OIDC_TOKEN", ""))
+    if not has_auth:
+        print("=== Skills.sh Audit ===")
+        print("API requires authentication. Use --token <VERCEL_OIDC_TOKEN> or set VERCEL_OIDC_TOKEN.")
+        print("Get a token: vercel env pull (from a linked Vercel project)")
+        print()
+        print("Skills found locally (not checked against API):")
+        for s in analyzed[:10]:
+            agents_str = locs_str(s)
+            print(f"  {s['qualified']:<35} {agents_str}")
+        if len(analyzed) > 10:
+            print(f"  ... and {len(analyzed) - 10} more")
+        sys.exit(0)
+
+    audited = [s for s in analyzed if s.get("audit_result") and not s["audit_result"].get("error")]
+    auth_err = any(s.get("audit_result", {}).get("error") == "auth_required" for s in analyzed)
+    no_api = [s for s in analyzed if not s.get("audit_result")]
+    flagged = [s for s in audited if s["audit_result"].get("is_duplicate")]
+
+    print("=== Skills.sh Audit ===")
+    print(f"Checked: {len(analyzed)} skills | Found: {len(audited)} | Not found: {len(no_api)}")
+    print()
+
+    if flagged:
+        print(f"--- Duplicates on skills.sh ({len(flagged)}) ---")
+        for s in flagged:
+            r = s["audit_result"]
+            print(f"  ⚠ {s['qualified']} -> {r['skill_id']} ({r['installs']} installs)  {r['url']}")
+        print()
+
+    # Show audit verdicts
+    has_audits = [s for s in audited if s["audit_result"].get("audits")]
+    if has_audits:
+        print(f"--- Security Audits ({len(has_audits)} skills) ---")
+        for s in has_audits:
+            r = s["audit_result"]
+            print(f"  {s['qualified']} ({r['installs']} installs)")
+            for a in r["audits"]:
+                status_icon = {"pass": "✓", "warn": "⚠", "fail": "✗"}.get(a.get("status", ""), "?")
+                risk = a.get("riskLevel", "")
+                print(f"    {status_icon} {a['provider']}: {a.get('summary', '')} [{risk}]")
+            print()
+
+    if not flagged and not has_audits:
+        print("No issues found.")
+
+    sys.exit(0)
+
 # ─── Lint output ───────────────────────────────────────────────────────────
 if LINT_ONLY:
     linted = [s for s in analyzed if s.get("lint_findings")]
@@ -965,6 +1098,21 @@ if not TOKENS_ONLY:
     elif not TOKENS_ONLY:
         print("--- Lint: All clean ---")
         print()
+
+# --- Audit (skills.sh) ---
+if AUDIT_MODE and not TOKENS_ONLY and not LINT_ONLY and not FIX_MODE:
+    audited = [s for s in analyzed if s.get("audit_result") and not s["audit_result"].get("error")]
+    if audited:
+        flagged = [s for s in audited if s["audit_result"].get("is_duplicate")]
+        with_audits = [s for s in audited if s["audit_result"].get("audits")]
+        print(f"--- Skills.sh Audit ({len(audited)} found, {len(flagged)} duplicates, {len(with_audits)} audited) ---")
+        for s in flagged[:5]:
+            r = s["audit_result"]
+            print(f"  ⚠ {s['qualified']} -> duplicate of {r['skill_id']} ({r['installs']} installs)")
+        if len(flagged) > 5:
+            print(f"  ... and {len(flagged) - 5} more duplicates")
+        if flagged:
+            print()
 
 # --- Tokens ---
 print("--- Token Cost ---")

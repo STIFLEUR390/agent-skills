@@ -63,6 +63,9 @@ bash scripts/health-check.sh --fix --apply
 | `--lint` | Lint frontmatter (quality checks) |
 | `--fix` | Auto-fix commun (dry-run par défaut) |
 | `--apply` | Appliquer les fixes (avec `--fix`) |
+| `--audit` | Audit via skills.sh API (nos skills) |
+| `--audit-all` | Audit tous les skills via l'API |
+| `--token <TOKEN>` | Token Vercel OIDC pour l'API |
 | `--scope user` | Skills utilisateur uniquement |
 | `--scope project` | Skills projet uniquement |
 | `--scope all` | Tous les scopes (défaut) |
@@ -227,6 +230,24 @@ Corrections automatiques (dry-run par défaut, `--apply` pour écrire) :
 - Ajout de `metadata.version: "1.0.0"` si absent
 
 Ne touche PAS : les skills plugin/marketplace, les liens brisés, les fichiers sans SKILL.md.
+
+## Audit skills.sh
+
+Vérifie l'état de vos skills sur [skills.sh](https://skills.sh) :
+- Détecte les doublons (forks/copies)
+- Affiche les résultats de sécurité (Gen, Socket, Snyk)
+- Affiche le nombre d'installs
+
+Nécessite un token Vercel OIDC :
+
+```bash
+# Depuis un projet Vercel lié
+vercel env pull
+bash scripts/health-check.sh --audit
+
+# Ou directement
+bash scripts/health-check.sh --audit --token <VERCEL_OIDC_TOKEN>
+```
 
 ## Différence avec skills-janitor
 

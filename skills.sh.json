@@ -1,0 +1,21 @@
+{
+  "$schema": "https://skills.sh/schemas/skills.sh.schema.json",
+  "notGrouped": "bottom",
+  "groupings": [
+    {
+      "title": "Project",
+      "description": "Skills for defining, planning, and managing software projects.",
+      "skills": [
+        "project-definer"
+      ]
+    },
+    {
+      "title": "Skills Management",
+      "description": "Skills for creating, auditing, and maintaining agent skills across multiple platforms.",
+      "skills": [
+        "skill-creator",
+        "skill-health-checker"
+      ]
+    }
+  ]
+}

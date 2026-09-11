@@ -1,5 +1,7 @@
 # Agent Skills Manager
 
+[![skills.sh](https://skills.sh/b/STIFLEUR390/agent-skills)](https://skills.sh/STIFLEUR390/agent-skills)
+
 Skills multi-agents compatibles Claude Code, Codex, OpenCode, Pi, omp et [75+ agents](https://skills.sh).
 
 ## Installation rapide
@@ -115,6 +117,11 @@ bash skills/skill-health-checker/scripts/health-checker.sh --tokens
 4. Ajouter la doc dans `docs/<name>/GUIDE.md`
 5. Audit santé : `bash skills/skill-health-checker/scripts/health-check.sh`
 6. Push
+
+## skills.sh
+
+Ce repo est listé sur [skills.sh/STIFLEUR390/agent-skills](https://skills.sh/STIFLEUR390/agent-skills).
+Le fichier `skills.sh.json` contrôle le grouping sur la page du repo.
 
 ## License
 

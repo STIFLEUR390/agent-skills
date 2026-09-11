@@ -102,6 +102,17 @@ bash scripts/health-check.sh --tokens
 bash scripts/health-check.sh --dupes
 ```
 
+### Audit skills.sh
+
+```bash
+# Audit nos skills sur skills.sh (nécessite un token Vercel OIDC)
+bash scripts/health-check.sh --audit --token <VERCEL_OIDC_TOKEN>
+
+# Ou avec la variable d'env
+export VERCEL_OIDC_TOKEN=...
+bash scripts/health-check.sh --audit
+```
+
 ### Lint frontmatter
 
 ```bash
