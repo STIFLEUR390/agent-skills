@@ -136,8 +136,8 @@ fi
 export SKILLS_TSV BUDGET BRIEF JSON_OUTPUT SECURITY_ONLY TOKENS_ONLY DUPES_ONLY
 
 python3 << 'PYEOF'
+import base64
 import json
-import math
 import os
 import re
 import sys
@@ -153,14 +153,14 @@ TOKENS_ONLY = os.environ.get("TOKENS_ONLY", "false") == "true"
 DUPES_ONLY = os.environ.get("DUPES_ONLY", "false") == "true"
 
 # ─── Load skills ────────────────────────────────────────────────────────────
-skills = []
+skills_raw = []
 with open(SKILLS_TSV) as f:
     for line in f:
         parts = line.rstrip("\n").split("\t", 4)
         if len(parts) < 5:
             continue
         name, scope, agent, qualified, path = parts
-        skills.append({
+        skills_raw.append({
             "name": name,
             "scope": scope,
             "agent": agent,
@@ -168,7 +168,26 @@ with open(SKILLS_TSV) as f:
             "path": path,
         })
 
-# ─── SKILL.md analysis ──────────────────────────────────────────────────────
+# ─── Dedup by realpath ──────────────────────────────────────────────────────
+# Same skill symlinked across agents → keep one record, track all locations.
+# This prevents: broken symlinks listed N times, security scan N times, etc.
+by_realpath = {}
+for s in skills_raw:
+    rp = os.path.realpath(s["path"]) if os.path.exists(s["path"]) or os.path.islink(s["path"]) else s["path"]
+    if rp not in by_realpath:
+        by_realpath[rp] = {
+            "name": s["name"],
+            "qualified": s["qualified"],
+            "path": s["path"],       # first occurrence
+            "realpath": rp,
+            "locations": [],         # all (scope, agent) pairs
+        }
+    by_realpath[rp]["locations"].append({"scope": s["scope"], "agent": s["agent"]})
+
+# Canonical list — one entry per physical skill
+skills = list(by_realpath.values())
+
+# ─── Helpers ────────────────────────────────────────────────────────────────
 STOP_WORDS = {
     "use", "when", "the", "user", "wants", "to", "or", "and", "a", "an",
     "this", "skill", "also", "that", "for", "with", "in", "on", "of",
@@ -187,7 +206,6 @@ def estimate_tokens(text):
     return max(1, len(text) // 4)
 
 def extract_description(skill_file):
-    """Extract description from frontmatter, handles block scalars."""
     try:
         with open(skill_file, encoding="utf-8", errors="replace") as f:
             lines = f.readlines()
@@ -221,7 +239,11 @@ def extract_description(skill_file):
                     break
     return " ".join(desc_lines)
 
-# Analyze each skill
+def strip_code_fences(text):
+    """Remove fenced code blocks (``` ... ```) from markdown before checking HTML comments."""
+    return re.sub(r'```.*?```', '', text, flags=re.S)
+
+# ─── Analyze each skill ─────────────────────────────────────────────────────
 analyzed = []
 for s in skills:
     path = s["path"]
@@ -234,10 +256,10 @@ for s in skills:
 
     info = {
         "name": s["name"],
-        "scope": s["scope"],
-        "agent": s["agent"],
         "qualified": s["qualified"],
         "path": path,
+        "realpath": s["realpath"],
+        "locations": s["locations"],
         "has_skill_file": skill_file is not None,
         "is_symlink": os.path.islink(path),
         "symlink_broken": os.path.islink(path) and not os.path.exists(path),
@@ -262,17 +284,14 @@ for s in skills:
         lines = content.split("\n")
         info["line_count"] = len([l for l in lines if l.strip()])
 
-        # Frontmatter check
         if lines and lines[0].strip() == "---":
             info["has_frontmatter"] = True
 
-        # Description
         desc = extract_description(skill_file)
         info["description"] = desc
         info["desc_tokens"] = estimate_tokens(desc)
         info["keywords"] = extract_keywords(desc)
 
-        # Body tokens (everything after second ---)
         fm_end = 0
         found_first = False
         for i, line in enumerate(lines):
@@ -286,7 +305,6 @@ for s in skills:
         info["body_tokens"] = estimate_tokens(body)
         info["total_tokens"] = info["desc_tokens"] + info["body_tokens"]
 
-    # Extra files count
     if os.path.isdir(path):
         count = 0
         for root, dirs, files in os.walk(path):
@@ -300,7 +318,7 @@ for s in skills:
 
     analyzed.append(info)
 
-# ─── Security scan ──────────────────────────────────────────────────────────
+# ─── Security scan (deduped — runs once per physical skill) ─────────────────
 def security_scan(skill_info):
     findings = []
     path = skill_info["path"]
@@ -355,13 +373,24 @@ def security_scan(skill_info):
                 if m:
                     findings.append({"rule": rule_id, "severity": sev, "title": title,
                                    "file": rel, "evidence": text[max(0, m.start()-30):m.end()+30][:120]})
-            # HTML comments
-            for m in HTML_COMMENT.finditer(text):
-                body = m.group(1)
-                if len(body) > 20:
-                    findings.append({"rule": "md-htmlcomment", "severity": "MEDIUM",
-                                   "title": "HTML comment with content", "file": rel, "evidence": body[:120]})
-                    break
+
+            # HTML comments — strip code fences first, skip short/innocuous ones
+            prose = strip_code_fences(text)
+            for m in HTML_COMMENT.finditer(prose):
+                body = m.group(1).strip()
+                # Skip short comments (docs/annotations), CSS attributes, etc.
+                if len(body) < 50:
+                    continue
+                # Skip comments that look like documentation / CSS / HTML
+                if re.search(r'(?:width|height|color|background|font|margin|padding|display|position|class=|style=|data-)', body, re.I):
+                    continue
+                # Skip comments that are just code hints
+                if re.search(r'^(?:\s*(?:div|span|img|a|section|article|header|footer|nav|main|aside)\b)', body, re.I):
+                    continue
+                findings.append({"rule": "md-htmlcomment", "severity": "MEDIUM",
+                               "title": "HTML comment with content", "file": rel, "evidence": body[:120]})
+                break  # one per file is enough
+
             # Base64 blobs
             for m in B64_BLOB.finditer(text):
                 blob = m.group(0)
@@ -387,7 +416,6 @@ def security_scan(skill_info):
     MD_EXT = {".md", ".markdown", ".txt"}
     SCRIPT_EXT = {".sh", ".bash", ".zsh", ".py", ".js", ".mjs", ".ts", ".rb"}
 
-    import base64
     n = 0
     for root, dirs, files in os.walk(path):
         dirs[:] = [d for d in dirs if d not in (".git", "node_modules", "__pycache__")]
@@ -414,42 +442,43 @@ if not TOKENS_ONLY and not DUPES_ONLY:
 
 # ─── Duplicate detection ────────────────────────────────────────────────────
 def find_dupes(skills_list):
-    # Group by realpath (dedup symlinks)
-    by_realpath = {}
-    for s in skills_list:
-        rp = os.path.realpath(s["path"])
-        if rp not in by_realpath:
-            by_realpath[rp] = s
-
-    unique = list(by_realpath.values())
-
-    # Name collisions
+    # Name collisions — same name in different realpaths
     by_name = defaultdict(list)
-    for s in unique:
-        by_name[s["qualified"]].append(s)
+    for s in skills_list:
+        by_name[s["name"]].append(s)
     name_collisions = {n: lst for n, lst in by_name.items() if len(lst) > 1}
 
-    # Description overlap (Jaccard)
+    # Description overlap (Jaccard) — between genuinely different skills
     overlaps = []
-    for i in range(len(unique)):
-        kw_i = unique[i]["keywords"]
+    seen_pairs = set()
+    for i in range(len(skills_list)):
+        kw_i = skills_list[i]["keywords"]
         if not kw_i:
             continue
-        for j in range(i + 1, len(unique)):
-            kw_j = unique[j]["keywords"]
+        for j in range(i + 1, len(skills_list)):
+            kw_j = skills_list[j]["keywords"]
             if not kw_j:
                 continue
+            # Skip same physical skill or same name (deployed across agents)
+            if skills_list[i]["realpath"] == skills_list[j]["realpath"]:
+                continue
+            if skills_list[i]["name"] == skills_list[j]["name"]:
+                continue
+            pair = tuple(sorted([skills_list[i]["realpath"], skills_list[j]["realpath"]]))
+            if pair in seen_pairs:
+                continue
+            seen_pairs.add(pair)
             common = kw_i & kw_j
             union = kw_i | kw_j
             sim = len(common) / len(union) if union else 0
             if sim > 0.3:
                 overlaps.append({
-                    "a": unique[i]["qualified"],
-                    "b": unique[j]["qualified"],
+                    "a": skills_list[i]["qualified"],
+                    "b": skills_list[j]["qualified"],
                     "similarity": round(sim * 100),
                     "common": sorted(common)[:8],
-                    "scope_a": unique[i]["scope"],
-                    "scope_b": unique[j]["scope"],
+                    "scope_a": skills_list[i]["locations"][0]["scope"],
+                    "scope_b": skills_list[j]["locations"][0]["scope"],
                 })
     overlaps.sort(key=lambda x: x["similarity"], reverse=True)
 
@@ -469,8 +498,21 @@ risk_skills = [s for s in analyzed if any(f["severity"] == "HIGH" for f in s["se
 review_skills = [s for s in analyzed if not any(f["severity"] == "HIGH" for f in s["security_findings"]) and any(f["severity"] == "MEDIUM" for f in s["security_findings"])]
 pass_skills = [s for s in analyzed if not s["security_findings"]]
 
-top_tokens = sorted(analyzed, key=lambda s: s["total_tokens"], reverse=True)[:10]
-unused = [s for s in analyzed if s["description"] == "" and not s["has_skill_file"]]
+# Group by name for token ranking — same skill in multiple agents counts once
+by_name_tok = {}
+for s in analyzed:
+    nm = s["name"]
+    if nm not in by_name_tok:
+        by_name_tok[nm] = {
+            "name": nm,
+            "qualified": s["qualified"],
+            "total_tokens": s["total_tokens"],
+            "desc_tokens": s["desc_tokens"],
+            "locations": list(s["locations"]),
+        }
+    else:
+        by_name_tok[nm]["locations"].extend(s["locations"])
+top_tokens = sorted(by_name_tok.values(), key=lambda s: -s["total_tokens"])[:10]
 broken = [s for s in analyzed if s["symlink_broken"]]
 
 # ─── JSON output ────────────────────────────────────────────────────────────
@@ -485,19 +527,24 @@ if JSON_OUTPUT:
         "broken_symlinks": len(broken),
         "name_collisions": len(name_collisions),
         "description_overlaps": len(overlaps),
-        "skills": [{k: v for k, v in s.items() if k != "keywords"} for s in analyzed],
+        "skills": [{k: v for k, v in s.items() if k not in ("keywords", "locations")} for s in analyzed],
     }
     print(json.dumps(out, indent=2, default=str))
     sys.exit(0)
 
 # ─── Human-readable output ──────────────────────────────────────────────────
+def locs_str(s):
+    """Format locations for display: (pi, claude, opencode)"""
+    agents = sorted(set(l["agent"] for l in s["locations"]))
+    return ", ".join(agents)
+
 if SECURITY_ONLY:
     print("=== Security Scan ===")
-    print(f"Scanned: {len(analyzed)} skills | RISK: {len(risk_skills)} | REVIEW: {len(review_skills)} | PASS: {len(pass_skills)}")
+    print(f"Scanned: {len(analyzed)} unique skills | RISK: {len(risk_skills)} | REVIEW: {len(review_skills)} | PASS: {len(pass_skills)}")
     print()
     for s in risk_skills + review_skills:
         verdict = "RISK" if any(f["severity"] == "HIGH" for f in s["security_findings"]) else "REVIEW"
-        print(f"[{verdict}] {s['qualified']} ({s['scope']}/{s['agent']})")
+        print(f"[{verdict}] {s['qualified']} ({locs_str(s)})")
         for f in sorted(s["security_findings"], key=severity_rank):
             print(f"    {f['severity']:<6} {f['title']}")
             print(f"           {f['file']}: {f['evidence'][:100]}")
@@ -513,10 +560,10 @@ if TOKENS_ONLY:
     print(f"Always-loaded (descriptions): {desc_tokens:,} tokens")
     print(f"On-trigger (bodies):          {total_tokens - desc_tokens:,} tokens")
     print()
-    print(f"{'Skill':<40} {'Desc':>6} {'Body':>6} {'Total':>6}")
-    print("-" * 62)
+    print(f"{'Skill':<35} {'Agents':<20} {'Tokens':>6}")
+    print("-" * 65)
     for s in top_tokens:
-        print(f"{s['qualified']:<40} {s['desc_tokens']:>6} {s['body_tokens']:>6} {s['total_tokens']:>6}")
+        print(f"{s['qualified']:<35} {locs_str(s):<20} {s['total_tokens']:>6}")
     sys.exit(0)
 
 if DUPES_ONLY:
@@ -527,7 +574,8 @@ if DUPES_ONLY:
         for name, entries in name_collisions.items():
             print(f"  {name}")
             for e in entries:
-                print(f"    [{e['scope']}/{e['agent']}] {e['path']}")
+                agents = locs_str(e)
+                print(f"    [{agents}] {e['path']}")
             print()
     if overlaps:
         print(f"--- Description Overlap ({len(overlaps)}) ---")
@@ -541,36 +589,43 @@ if DUPES_ONLY:
     sys.exit(0)
 
 # ─── Full report ────────────────────────────────────────────────────────────
+total_locations = sum(len(s["locations"]) for s in analyzed)
 print("=== Skill Health Checker ===")
-print(f"Skills found: {len(analyzed)} across {len(set(s['agent'] for s in analyzed))} agents")
+print(f"Unique skills: {len(analyzed)} | Installed copies: {total_locations} across {len(set(l['agent'] for s in analyzed for l in s['locations']))} agents")
 print(f"Budget: {BUDGET:,} tokens | Used: {total_tokens:,} ({budget_pct:.1f}%)")
 print()
 
 if BRIEF:
-    # Brief mode: inventory only
-    by_agent = defaultdict(list)
+    by_agent = defaultdict(int)
     for s in analyzed:
-        by_agent[s["agent"]].append(s)
-    for agent, agent_skills in sorted(by_agent.items()):
-        print(f"  {agent}: {len(agent_skills)} skills")
+        for l in s["locations"]:
+            by_agent[l["agent"]] += 1
+    for agent, count in sorted(by_agent.items()):
+        print(f"  {agent}: {count} skills")
     sys.exit(0)
 
 # --- Inventory ---
 print("--- Inventory ---")
-by_agent = defaultdict(list)
+by_agent = defaultdict(lambda: {"total": 0, "no_fm": 0, "no_file": 0, "symlinks": 0})
 for s in analyzed:
-    by_agent[s["agent"]].append(s)
-for agent, agent_skills in sorted(by_agent.items()):
-    no_fm = sum(1 for s in agent_skills if not s["has_frontmatter"])
-    no_file = sum(1 for s in agent_skills if not s["has_skill_file"])
-    symlinks = sum(1 for s in agent_skills if s["is_symlink"])
-    line = f"  {agent:<12} {len(agent_skills):>3} skills"
-    if no_file:
-        line += f"  ⚠ {no_file} missing SKILL.md"
-    if no_fm:
-        line += f"  ⚠ {no_fm} no frontmatter"
-    if symlinks:
-        line += f"  🔗 {symlinks} symlinks"
+    for l in s["locations"]:
+        bucket = by_agent[l["agent"]]
+        bucket["total"] += 1
+        if not s["has_frontmatter"]:
+            bucket["no_fm"] += 1
+        if not s["has_skill_file"]:
+            bucket["no_file"] += 1
+        if s["is_symlink"]:
+            bucket["symlinks"] += 1
+
+for agent, counts in sorted(by_agent.items()):
+    line = f"  {agent:<12} {counts['total']:>3} skills"
+    if counts["no_file"]:
+        line += f"  ⚠ {counts['no_file']} missing SKILL.md"
+    if counts["no_fm"]:
+        line += f"  ⚠ {counts['no_fm']} no frontmatter"
+    if counts["symlinks"]:
+        line += f"  🔗 {counts['symlinks']} symlinks"
     print(line)
 print()
 
@@ -579,7 +634,8 @@ if broken:
     print(f"--- Broken Symlinks ({len(broken)}) ---")
     for s in broken:
         target = os.readlink(s["path"]) if os.path.islink(s["path"]) else "?"
-        print(f"  ✗ {s['qualified']} -> {target}")
+        agents = locs_str(s)
+        print(f"  ✗ {s['qualified']} -> {target}  ({agents})")
     print()
 
 # --- Security ---
@@ -587,24 +643,25 @@ if risk_skills or review_skills:
     print(f"--- Security ({len(risk_skills)} RISK, {len(review_skills)} REVIEW) ---")
     for s in risk_skills + review_skills:
         verdict = "RISK" if any(f["severity"] == "HIGH" for f in s["security_findings"]) else "REVIEW"
-        print(f"  [{verdict}] {s['qualified']}")
+        print(f"  [{verdict}] {s['qualified']} ({locs_str(s)})")
         for f in sorted(s["security_findings"], key=severity_rank):
             print(f"         {f['severity']:<6} {f['title']}")
+            print(f"                {f['file']}")
     print()
 elif not TOKENS_ONLY:
     print("--- Security: All clear ---")
     print()
 
 # --- Tokens ---
-print(f"--- Token Cost ---")
+print("--- Token Cost ---")
 print(f"  Total: {total_tokens:,} / {BUDGET:,} ({budget_pct:.1f}%)")
 print(f"  Always-loaded (descriptions): {desc_tokens:,}")
 print()
-print(f"  {'Skill':<35} {'Agent':<8} {'Tokens':>6}  {'%':>5}")
-print(f"  {'-'*58}")
+print(f"  {'Skill':<35} {'Agents':<20} {'Tokens':>6}  {'%':>5}")
+print(f"  {'-'*70}")
 for s in top_tokens:
     pct = (s["total_tokens"] / BUDGET * 100) if BUDGET else 0
-    print(f"  {s['qualified']:<35} {s['agent']:<8} {s['total_tokens']:>6}  {pct:>4.1f}%")
+    print(f"  {s['qualified']:<35} {locs_str(s):<20} {s['total_tokens']:>6}  {pct:>4.1f}%")
 print()
 
 # --- Duplicates ---
@@ -613,15 +670,16 @@ if name_collisions or overlaps:
     for name, entries in list(name_collisions.items())[:5]:
         print(f"  ⚠ Name collision: {name}")
         for e in entries:
-            print(f"    [{e['scope']}/{e['agent']}] {e['path']}")
+            agents = locs_str(e)
+            print(f"    [{agents}] {e['path']}")
     for o in overlaps[:5]:
         print(f"  [{o['similarity']}%] {o['a']} <-> {o['b']}")
     print()
 
 # --- Summary ---
 print("=== Summary ===")
-print(f"  Skills: {len(analyzed)}")
-print(f"  Agents: {len(set(s['agent'] for s in analyzed))}")
+print(f"  Unique skills: {len(analyzed)}")
+print(f"  Installed copies: {total_locations}")
 print(f"  Context: {total_tokens:,} tokens ({budget_pct:.1f}% of {BUDGET:,})")
 if risk_skills:
     print(f"  ⚠ Security: {len(risk_skills)} skills need manual review (RISK)")

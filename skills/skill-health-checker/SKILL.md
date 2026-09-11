@@ -105,39 +105,43 @@ bash scripts/health-check.sh --dupes
 ## Ce que le rapport contient
 
 ### 1. Inventaire
-- Nombre de skills par agent
+- Nombre de skills **uniques** vs copies installées (symlinks)
 - Skills avec/sans SKILL.md
 - Skills avec/sans frontmatter valide
-- Liens symboliques (et les brisés)
+- Liens symboliques (et les brisés, dédupés par realpath)
 
 ### 2. Sécurité (heuristiques, pas preuve)
 - Phrases d'injection prompt ("ignore previous instructions", etc.)
-- Instructions cachées dans commentaires HTML
+- Instructions cachées dans commentaires HTML (> 50 chars, hors code fences)
 - Bases64 suspectes (smuggling)
 - Scripts avec `curl|wget` piped into shell
 - Accès aux magasins de credentials
 - URLs raccourcies (destination cachée)
 - Unicode zero-width / RTL override
 
+Filtrage automatique : commentaires courts (< 50 chars), CSS/HTML attributes, balises doc.
+
 Verdicts : PASS / REVIEW / RISK
 
 ### 3. Tokens
-- Taille de chaque SKILL.md en tokens estimés (≈4 chars/token)
+- Taille de chaque skill en tokens estimés (≈4 chars/token)
+- Regroupé par nom (pas de duplication par agent)
 - Pourcentage du budget contexte (défaut 200k)
 - Séparation toujours-chargé (description) vs on-trigger (body)
-- Top 10 des plus gourmands
+- Top 10 des plus gourmands avec agents listés
 
 ### 4. Doublons
-- Même nom dans des agents différents
-- Descriptions à cheval (similarité Jaccard > 30%)
-- Skills plugin vs standalone
+- **Name collisions** : même nom, chemin physique différent
+- **Description overlaps** : similarité Jaccard > 30% entre skills différents
+- Les copies cross-agents (même nom) ne sont PAS flagged comme overlap
 
 ## Validation — comment savoir qu'on a fini
 
 - [ ] Rapport affiché sans erreur
-- [ ] Skills RISK vérifiés manuellement
+- [ ] `RISK` vérifiés manuellement
+- [ ] `Broken symlinks` nettoyés
 - [ ] Skills inutiles supprimés ou désactivés
-- [ ] Budget token réduit si > 50% utilisation
+- [ ] Budget token < 100% (sinon, réduire les skills ou augmenter le contexte)
 
 ## Erreurs courantes à éviter
 

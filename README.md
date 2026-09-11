@@ -21,7 +21,7 @@ npx skills add STIFLEUR390/agent-skills --skill project-definer -a claude-code
 |-------|-------------|-------|
 | [project-definer](skills/project-definer/) | Définition complète d'un projet : découverte, cahier des charges, PRD, architecture, rôles/permissions, isolation, paiements | Lancer un nouveau projet |
 | [skill-creator](skills/skill-creator/) | Créer un nouveau skill agent multi-plateforme avec les bonnes pratiques | Ajouter un skill au repo |
-| [skill-health-checker](skills/skill-health-checker/) | Auditer tous les skills installés : inventaire, sécurité, tokens, doublons cross-agents | Vérifier l'état de santé des skills |
+| [skill-health-checker](skills/skill-health-checker/) | Auditer tous les skills installés sur Pi, Claude, Codex, omp, OpenCode : inventaire, sécurité, tokens, doublons cross-agents | Vérifier l'état de santé des skills |
 
 ## Développement
 
@@ -71,6 +71,22 @@ bash skills/skill-creator/scripts/deploy.sh <skill-name>
 for skill in skills/*/; do
   bash skills/skill-creator/scripts/deploy.sh "$(basename "$skill")"
 done
+```
+
+### Audit santé
+
+```bash
+# Rapport complet (inventaire + sécurité + tokens + doublons)
+bash skills/skill-health-checker/scripts/health-check.sh
+
+# Mode bref
+bash skills/skill-health-checker/scripts/health-check.sh --brief
+
+# Scan sécurité seul
+bash skills/skill-health-checker/scripts/health-check.sh --security
+
+# Estimation tokens
+bash skills/skill-health-checker/scripts/health-checker.sh --tokens
 ```
 
 ## Compatibilité

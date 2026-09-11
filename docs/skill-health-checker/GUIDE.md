@@ -4,7 +4,8 @@
 
 Le Skill Health Checker est un outil CLI qui audite tous les skills installés
 sur tes agents IA. Il combine inventaire, sécurité, tokens et doublons dans
-un seul rapport.
+un seul rapport. Un skill symlinké dans 5 agents est compté et analysé une
+seule fois (dédup par realpath).
 
 Inspiré par [skills-janitor](https://github.com/khendzel/skills-janitor),
 adapté pour notre setup multi-agents (Pi + Claude Code + Codex + omp + OpenCode).
@@ -67,6 +68,32 @@ bash scripts/health-check.sh --json
 | Plugins Claude | `~/.claude/plugins/marketplaces/*/skills/` |
 | Sources Claude | `~/.claude/sources/*/skills/` |
 
+## Comportement
+
+### Déduplication
+
+Un même skill symlinké dans plusieurs agents est compté **une seule fois**.
+Le rapport affiche :
+- `Unique skills` : nombre de skills physiques
+- `Installed copies` : nombre total d'emplacements (symlinks inclus)
+
+Exemple : `graphify` dans Pi + Claude + Codex + opencode = 1 skill unique, 4 copies.
+
+### Sécurité — filtrage des faux positifs
+
+Le scan security filtre automatiquement :
+- Les commentaires HTML dans les blocs de code (```` ``` ````)
+- Les commentaires courts (< 50 caractères) — annotations légitimes
+- Les commentaires contenant des attributs CSS/HTML (width, class, data-, etc.)
+- Les balises HTML dans la documentation (div, span, img, etc.)
+
+Seuls les commentaires HTML longs et suspects sont flaggés.
+
+### Tokens — regroupement par nom
+
+Le classement token regroupe les copies d'un même skill. `talking-head-recut`
+installé dans 3 agents apparaît une fois avec "Agents: .agents, .claude, agent".
+
 ## Rapport de sécurité
 
 Le scan security est **heuristique** — il détecte des patterns suspects,
@@ -88,7 +115,7 @@ pas des preuves de malice.
 - `inj-secrecy` — "secretly run/send" (directive de secret)
 - `inj-newrole` — "you are no longer" (override de rôle)
 - `uni-hidden` — Unicode zero-width / RTL override
-- `md-htmlcomment` — Instructions dans commentaires HTML
+- `md-htmlcomment` — Instructions dans commentaires HTML (> 50 chars, filtré)
 - `md-b64` — Blob base64 décodable (smuggling)
 
 #### Scripts
@@ -113,26 +140,55 @@ Le budget par défaut est 200k tokens (taille typique d'une fenêtre de contexte
 
 ```
 === Skill Health Checker ===
-Skills found: 47 across 3 agents
+Unique skills: 85 | Installed copies: 163 across 5 agents
 
-  pi:           32 skills
-  claude:       12 skills
-  claude/plugin: 3 skills
+  .agents: 41 skills
+  .claude: 47 skills
+  agent:   42 skills
+  claude:  20 skills
+  opencode: 13 skills
 ```
 
 ### --security
 
 ```
 === Security Scan ===
-Scanned: 47 skills | RISK: 1 | REVIEW: 2 | PASS: 44
+Scanned: 85 unique skills | RISK: 0 | REVIEW: 2 | PASS: 83
 
-[RISK] sketchfab-tools (user/pi)
-    HIGH   Instruction-override phrase
-           README.md: "...ignore previous instructions and..."
+[REVIEW] hyperframes-cli (.agents, .claude, agent)
+    MEDIUM HTML comment with content
+           references/init-and-scaffold.md
+```
 
-[REVIEW] web-scraper (user/claude)
-    MEDIUM Plain-HTTP call
-           scripts/fetch.sh: curl http://example.com/api
+### --tokens
+
+```
+=== Token Cost Estimate ===
+Budget: 200,000 tokens
+Total:  214,838 tokens (107.4% of budget)
+
+Skill                               Agents               Tokens
+-----------------------------------------------------------------
+talking-head-recut                  .agents, .claude, agent  16328
+graphify                            .agents, .claude, agent, opencode  10098
+slideshow                           .agents, .claude, agent   8396
+```
+
+### --dupes
+
+```
+=== Duplicate Detection ===
+
+--- Name Collisions (8) ---
+  graphify
+    [agent] /home/user/.pi/agent/skills/graphify
+    [.claude] /home/user/.claude/skills/graphify
+    [.agents] /home/user/.agents/skills/graphify
+    [opencode] /home/user/.config/opencode/skills/graphify
+
+--- Description Overlap (2) ---
+  [100%] generate-git-commit <-> git-helper
+       Scopes: user / user
 ```
 
 ## Différence avec skills-janitor
@@ -141,9 +197,10 @@ Scanned: 47 skills | RISK: 1 | REVIEW: 2 | PASS: 44
 |--------|---------------|---------------------|
 | Agents | Claude Code + Codex | Pi + Claude + Codex + omp + OpenCode |
 | Plugin support | ✅ Claude plugins | ✅ Claude plugins + sources |
-| Security | ✅ Heuristiques | ✅ Mêmes heuristiques |
-| Tokens | Via transcripts | Estimation statique |
+| Security | ✅ Heuristiques | ✅ + filtrage faux positifs HTML |
+| Tokens | Via transcripts | Estimation statique + regroupement |
 | Usage | Via history.jsonl | Pas encore (futur) |
+| Dédup | Par realpath | Par realpath + par nom |
 | TUI Swipe | ✅ Tinder-style | ❌ Pas encore (futur) |
 | MCP servers | ✅ (v1.7) | ❌ Pas encore (futur) |
 | Dépendances | Bash + Python3 | Bash + Python3 |
