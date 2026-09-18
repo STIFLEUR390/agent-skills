@@ -10,6 +10,26 @@ Dépôt de skills multi-agents pour Claude Code, Codex, OpenCode, Pi et omp.
 | `skill-creator` | Créer un nouveau skill agent multi-plateforme | Ajouter un skill au repo |
 | `skill-health-checker` | Auditer tous les skills installés : inventaire, sécurité, tokens, doublons cross-agents | Vérifier l'état de santé des skills |
 
+## Skills Laravel 13
+
+| Skill | Description | Usage |
+|-------|-------------|-------|
+| `laravel-core` | Gateway : analyse le projet et route vers les skills spécialisés | Tout projet Laravel |
+| `laravel-inertia` | Inertia.js + Vue/React | Frontend full-stack |
+| `laravel-livewire` | Livewire 3 + Volt | Composants dynamiques |
+| `laravel-api` | REST API, JSON:API, Sanctum | API backend |
+| `laravel-mcp` | Serveur MCP pour outils AI | Intégration AI |
+| `laravel-ai` | Laravel AI SDK, RAG, embeddings | Features AI |
+| `laravel-microservice` | Microservices, event-driven | Architecture distribuée |
+| `laravel-testing` | Pest, PHPUnit, factories | Tests |
+| `laravel-deploy` | Docker, CI/CD, Forge, Vapor | Déploiement |
+| `laravel-security` | Auth, CSRF, headers, rate limiting | Sécurité |
+| `laravel-performance` | Cache, queries, profiling | Performance |
+| `laravel-multi-tenancy` | SaaS multi-tenant, isolation | Multi-tenancy |
+| `laravel-queue` | Jobs, batches, chains, Horizon | Traitement async |
+| `laravel-websocket` | Reverb, broadcasting, presence | Temps réel |
+| `laravel-admin` | Filament, ressources, widgets | Panneau admin |
+
 ## Conventions
 
 - Un skill = un dossier dans `skills/<name>/`
