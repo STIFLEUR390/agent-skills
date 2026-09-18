@@ -29,6 +29,15 @@ Dépôt de skills multi-agents pour Claude Code, Codex, OpenCode, Pi et omp.
 | `laravel-queue` | Jobs, batches, chains, Horizon | Traitement async |
 | `laravel-websocket` | Reverb, broadcasting, presence | Temps réel |
 | `laravel-admin` | Filament, ressources, widgets | Panneau admin |
+| `laravel-nuxt` | API Laravel optimisée pour Nuxt.js | Laravel ↔ Nuxt |
+
+## Skills Nuxt.js
+
+| Skill | Description | Usage |
+|-------|-------------|-------|
+| `nuxt-core` | Fondamentaux Nuxt v4 : pages, routing, composables | Tout projet Nuxt |
+| `nuxt-ui` | Composants UI, dark mode, tables, formulaires | Interfaces Nuxt UI |
+| `sentry` | Sentry pour Laravel + Nuxt : erreurs, logs, tracing | Monitoring complet |
 
 ## Conventions
 
