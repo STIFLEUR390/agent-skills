@@ -38,6 +38,7 @@ Dépôt de skills multi-agents pour Claude Code, Codex, OpenCode, Pi et omp.
 | `nuxt-core` | Fondamentaux Nuxt v4 : pages, routing, composables | Tout projet Nuxt |
 | `nuxt-ui` | Composants UI, dark mode, tables, formulaires | Interfaces Nuxt UI |
 | `sentry` | Sentry pour Laravel + Nuxt : erreurs, logs, tracing | Monitoring complet |
+| `pest` | Pest PHP : expectation API, datasets, mocking, arch testing | Testing PHP |
 
 ## Conventions
 

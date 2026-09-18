@@ -60,6 +60,7 @@ npx skills add STIFLEUR390/agent-skills --skill project-definer -a claude-code
 | Skill | Description | Usage |
 |-------|-------------|-------|
 | [sentry](skills/sentry/) | Sentry pour Laravel + Nuxt : erreurs, logs, tracing | Monitoring complet |
+| [pest](skills/pest/) | Pest PHP : expectation API, datasets, mocking, arch testing | Testing PHP |
 
 ## Développement
 
