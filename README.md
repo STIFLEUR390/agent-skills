@@ -62,6 +62,7 @@ npx skills add STIFLEUR390/agent-skills --skill project-definer -a claude-code
 | [sentry](skills/sentry/) | Sentry pour Laravel + Nuxt : erreurs, logs, tracing | Monitoring complet |
 | [pest](skills/pest/) | Pest PHP : expectation API, datasets, mocking, arch testing | Testing PHP |
 | [scribe](skills/scribe/) | Scribe : documentation API Laravel, annotations, OpenAPI | Doc API Laravel |
+| [spatie-query-builder](skills/spatie-query-builder/) | Spatie QB : filtering, sorting, includes, fields dynamiques | APIs REST dynamiques |
 
 ## Développement
 

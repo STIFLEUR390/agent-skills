@@ -40,6 +40,7 @@ Dépôt de skills multi-agents pour Claude Code, Codex, OpenCode, Pi et omp.
 | `sentry` | Sentry pour Laravel + Nuxt : erreurs, logs, tracing | Monitoring complet |
 | `pest` | Pest PHP : expectation API, datasets, mocking, arch testing | Testing PHP |
 | `scribe` | Scribe : documentation API Laravel, annotations, OpenAPI | Doc API Laravel |
+| `spatie-query-builder` | Spatie QB : filtering, sorting, includes, fields dynamiques | APIs REST dynamiques |
 
 ## Conventions
 
