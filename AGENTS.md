@@ -9,6 +9,7 @@ Dépôt de skills multi-agents pour Claude Code, Codex, OpenCode, Pi et omp.
 | `project-definer` | Définition complète d'un projet : découverte, cahier des charges, PRD, architecture | Lancer un nouveau projet |
 | `skill-creator` | Créer un nouveau skill agent multi-plateforme | Ajouter un skill au repo |
 | `skill-health-checker` | Auditer tous les skills installés : inventaire, sécurité, tokens, doublons cross-agents | Vérifier l'état de santé des skills |
+| `dokploy-deploy` | Déploiement prod Dokploy : compose, Dockerfile, GitHub, domaines, rollback, durcissement | Déployer sur Dokploy |
 
 ## Skills Laravel 13
 

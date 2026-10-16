@@ -55,6 +55,12 @@ npx skills add STIFLEUR390/agent-skills --skill project-definer -a claude-code
 | [nuxt-core](skills/nuxt-core/) | Fondamentaux Nuxt v4 : pages, routing, composables | Tout projet Nuxt |
 | [nuxt-ui](skills/nuxt-ui/) | Composants UI, dark mode, tables, formulaires | Interfaces Nuxt UI |
 
+### Déploiement & DevOps
+
+| Skill | Description | Usage |
+|-------|-------------|-------|
+| [dokploy-deploy](skills/dokploy-deploy/) | Déploiement prod Dokploy : compose, Dockerfile, GitHub, domaines/Traefik, volumes, rollback (Swarm + registry), durcissement | Déployer, diagnostiquer ou rollbacker sur Dokploy |
+
 ### Monitoring
 
 | Skill | Description | Usage |

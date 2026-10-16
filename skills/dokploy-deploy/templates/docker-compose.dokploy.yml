@@ -1,0 +1,62 @@
+# Gabarit docker-compose.yml conforme Dokploy.
+# Voir SKILL.md §Étapes 5-6 et references/methodes-deploiement.md
+#
+# Règles :
+# - expose, jamais "ports: X:X" (Traefik route via les Domains de l'UI)
+# - données persistantes en named volume (backup S3 possible)
+# - fichiers de config du repo → File Mounts (Advanced → Mounts) référencés en ../files/
+# - env : le .env de l'UI n'est PAS injecté automatiquement → env_file ou ${VAR}
+
+services:
+  app:
+    image: ${IMAGE:-USER/app:v1}        # tag immuable en prod, jamais :latest
+    #                                    # bases slim/alpine dans le Dockerfile
+    #                                    # (node:22-alpine, …) sauf nécessité
+    # build:                            # préférer image pré-buildée si build > ~2 Go RAM
+    #   context: .
+    #   dockerfile: Dockerfile
+    restart: unless-stopped
+    expose:
+      - 3000                            # jamais "3000:3000"
+    env_file:
+      - .env                            # injecte les variables de l'UI Dokploy
+    environment:
+      - NODE_ENV=production             # ou ciblé : - VAR=${VAR}
+    volumes:
+      - app-uploads:/app/uploads        # named volume → backup S3 possible
+      # - ../files/app.conf:/etc/app/conf.d/app.conf   # config venue d'un File Mount
+    healthcheck:                        # requis pour le rollback auto Swarm
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3                        # curl doit être dans l'image (alpine: apk add --no-cache curl)
+    security_opt:
+      - no-new-privileges:true
+    # networks:                         # seulement si services inter-communication
+    #   - dokploy-network               # (Isolated Deployments évite cette manip)
+
+  db:
+    image: postgres:16-alpine            # variantes alpine/slim = images plus légères
+    restart: unless-stopped
+    volumes:
+      - db-data:/var/lib/postgresql/data   # named volume = backup Volume Backups
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    expose:
+      - 5432                            # pas de port publique : credentials internes
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  db-data:
+  app-uploads:
+
+# networks:                             # décommenter hors Isolated Deployments
+#   dokploy-network:
+#     external: true
