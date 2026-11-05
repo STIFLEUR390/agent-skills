@@ -10,6 +10,7 @@ Dépôt de skills multi-agents pour Claude Code, Codex, OpenCode, Pi et omp.
 | `skill-creator` | Créer un nouveau skill agent multi-plateforme | Ajouter un skill au repo |
 | `skill-health-checker` | Auditer tous les skills installés : inventaire, sécurité, tokens, doublons cross-agents | Vérifier l'état de santé des skills |
 | `dokploy-deploy` | Déploiement prod Dokploy : compose, Dockerfile, GitHub, domaines, rollback, durcissement | Déployer sur Dokploy |
+| `searxng-mcp` | Recherche web, news, images, vidéos, extraction de page via le MCP `@aplix39/searxng-mcp` | Donner une recherche web sourcée à un agent |
 
 ## Skills Laravel 13
 

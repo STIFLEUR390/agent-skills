@@ -12,6 +12,7 @@ npx skills add STIFLEUR390/agent-skills --all
 
 # Un skill spécifique
 npx skills add STIFLEUR390/agent-skills --skill project-definer
+npx skills add STIFLEUR390/agent-skills --skill searxng-mcp
 
 # Un agent spécifique
 npx skills add STIFLEUR390/agent-skills --skill project-definer -a claude-code
@@ -60,6 +61,12 @@ npx skills add STIFLEUR390/agent-skills --skill project-definer -a claude-code
 | Skill | Description | Usage |
 |-------|-------------|-------|
 | [dokploy-deploy](skills/dokploy-deploy/) | Déploiement prod Dokploy : compose, Dockerfile, GitHub, domaines/Traefik, volumes, rollback (Swarm + registry), durcissement | Déployer, diagnostiquer ou rollbacker sur Dokploy |
+
+### Recherche web
+
+| Skill | Description | Usage |
+|-------|-------------|-------|
+| [searxng-mcp](skills/searxng-mcp/) | Recherche web, news, images, vidéos et extraction de page via le MCP `@aplix39/searxng-mcp` : paramètres, contrat de sortie, erreurs 403/429 | Donner une recherche web sourcée à un agent |
 
 ### Monitoring
 
@@ -111,6 +118,7 @@ skills/
 ├── laravel-admin/          # Filament admin
 ├── nuxt-core/              # Nuxt fondamentaux
 ├── nuxt-ui/                # Nuxt UI
+├── searxng-mcp/            # Recherche web via MCP
 └── sentry/                 # Sentry monitoring
 ```
 
