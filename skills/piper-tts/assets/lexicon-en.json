@@ -1,0 +1,14 @@
+{
+  "lang": "en",
+  "espeak_voice": "en-gb-x-rp",
+  "note": "Corrections mesurées sur Piper 1.8.0 / espeak-ng en-gb-x-rp (voix en_GB-*). Les homographes (close, use, lead…) ne sont PAS corrigeables par un remplacement global : voir references/prononciation-en.md et injecter [[ IPA ]] localement.",
+  "words": {
+    "Ms.": "[[mˈɪz]]",
+    "Ms": "[[mˈɪz]]",
+    "Prof.": "Professor",
+    "Dept.": "Department",
+    "approx.": "approximately",
+    "Linux": "[[lˈɪnəks]]",
+    "LaTeX": "[[lˈeɪtɛk]]"
+  }
+}
