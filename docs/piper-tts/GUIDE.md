@@ -128,9 +128,30 @@ phonèmes (moins de variation entre phrases).
 | tout est chuchoté/saturé | `--volume` trop haut, ou `--no-normalize` hérité |
 | voix absente | `PIPER_VOICES_DIR` non exporté |
 
+## MCP `piper-tts`
+
+Le skill est aussi exposable en MCP local ([piper-mcp](https://github.com/STIFLEUR390/piper-mcp)) :
+le serveur appelle ce script pour normaliser, donc les règles et le lexique restent
+la seule source de vérité. Côté agent, la détection est simple : si la liste
+d'outils contient `tts_generate` / `tts_phonemes` / `tts_voices`, les prendre ;
+sinon, lancer le script.
+
+```json
+{ "mcpServers": { "piper-tts": {
+  "command": "uv",
+  "args": ["run", "--directory", "/chemin/vers/piper-mcp", "piper-mcp"],
+  "env": { "PIPER_VOICES_DIR": "/home/moi/.local/share/piper-voices",
+           "PIPER_OUTPUT_DIR": "/home/moi/piper-out" } } } }
+```
+
+Les chemins doivent être **absolus** (un `.../piper-voices` recopié tel quel donne
+« aucune voix »). `normalized: false` dans la réponse = le serveur n'a pas trouvé
+le skill : repasser par le script, sinon rien n'est corrigé.
+
 ## Références
 
 - Piper (dépôt amont, CLI, API) : https://github.com/OHF-Voice/piper1-gpl
+- Serveur MCP local : https://github.com/STIFLEUR390/piper-mcp
 - Voix et `MODEL_CARD` : https://huggingface.co/rhasspy/piper-voices
 - Alphabet espeak-ng : https://github.com/espeak-ng/espeak-ng/blob/master/docs/phonemes.md
 - Échantillons pour choisir une voix : https://rhasspy.github.io/piper-samples/

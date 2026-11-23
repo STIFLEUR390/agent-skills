@@ -329,7 +329,7 @@ def main(argv: list[str] | None = None) -> int:
     model = resolve_voice(voice, voices_dir())
 
     if args.print_text or args.check:
-        print(text)
+        print(text, flush=True)  # avant le sous-processus --check, sinon l'ordre des lignes dépend du buffer
     if args.check:
         return phonemes(model, text)
 

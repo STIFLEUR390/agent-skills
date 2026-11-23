@@ -63,7 +63,8 @@ nécessaire (`ffplay fichier.wav`).
    prononcerait pas ; garder les sigles et les nombres, ils sont normalisés.
 2. **Choisir la langue et la voix** : `-l fr` (défaut) ou `-l en`. La voix par
    défaut est `fr_FR-siwis-medium` / `en_GB-alan-medium`.
-3. **Synthétiser** :
+3. **Synthétiser** — par le MCP `piper-tts` s'il est exposé (voir « MCP piper-tts »
+   ci-dessous), sinon par le script :
 
    ```bash
    scripts/piper-tts.py -l fr -o sortie.wav "Bonjour, ceci est un test."
@@ -78,6 +79,31 @@ nécessaire (`ffplay fichier.wav`).
    ```
 
    Il imprime le texte normalisé puis les phonèmes réels du modèle.
+
+## MCP `piper-tts` (si disponible)
+
+Si ton hôte expose `tts_generate`, `tts_phonemes` et `tts_voices` (souvent
+préfixés par le nom du serveur, p. ex. `mcp__piper_tts__tts_generate`), utilise-les :
+même moteur, même lexique, mêmes voix, en un seul appel, sans venv ni `PIPER_BIN`
+à gérer.
+
+| Besoin | Outil MCP | Équivalent CLI |
+|--------|-----------|----------------|
+| produire un WAV | `tts_generate(text, lang, voice, length_scale, sentence_silence, filename)` | `scripts/piper-tts.py -l fr -o x.wav "…"` |
+| vérifier l'IPA | `tts_phonemes(text, lang, voice)` → `text_normalized`, `phonemes`, `missing` | `scripts/piper-tts.py --check "…"` |
+| lister les voix | `tts_voices()` → `default`, `voices[]` | `scripts/piper-voices.sh installed` |
+
+Le WAV atterrit dans `PIPER_OUTPUT_DIR` (`~/piper-out` par défaut) et l'outil
+renvoie son chemin, sa durée et le texte normalisé.
+
+Reviens au script quand :
+
+- `tts_generate` renvoie `normalized: false` — le serveur n'a pas trouvé ce skill,
+  le texte est parti **sans correction** (dates, montants, anglicismes faux) ;
+- l'outil MCP renvoie une erreur (voix absente, `PIPER_VOICES_DIR` invalide) : le
+  script lit le même environnement et affiche le détail utile ;
+- `missing` n'est pas vide : symbole absent de la voix choisie, en changer plutôt
+  que de réécrire le texte.
 
 ## Le script
 

@@ -78,6 +78,10 @@ scripts/piper-voices.sh check              # contrôle tout ce qui est installé
 Les variables lues : `PIPER_VOICES_DIR`, `PIPER_BIN`, `PIPER_PYTHON`,
 `XDG_CACHE_HOME` (index `voices.json` mis en cache dans `~/.cache/piper-voices`).
 
+Si le MCP `piper-tts` est disponible dans ton hôte, son outil `tts_voices()` donne
+le même inventaire (répertoire, voix par défaut, tailles) sans lancer le script.
+Il ne télécharge rien : `install` reste ici.
+
 ## Quel fichier est « cassé » ?
 
 Les modèles pèsent 25 à 80 Mo. Un `.onnx` de 55 Mo alors que l'index en annonce
