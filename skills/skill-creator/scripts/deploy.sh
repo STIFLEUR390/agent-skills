@@ -2,8 +2,22 @@
 # Déployer un skill vers tous les agents
 set -euo pipefail
 
-SKILL_NAME="${1:?Usage: deploy.sh <skill-name> [source-dir]}"
+SKILL_NAME="${1:-}"
 SOURCE_DIR="${2:-.}"
+
+# --all : déploie tous les skills du répertoire source
+if [ "$SKILL_NAME" = "--all" ]; then
+  for d in "$SOURCE_DIR"/*/; do
+    [ -f "$d/SKILL.md" ] && bash "$0" "$(basename "$d")" "$SOURCE_DIR" >/dev/null
+  done
+  echo "✅ Tous les skills de $SOURCE_DIR déployés"
+  exit 0
+fi
+
+if [ -z "$SKILL_NAME" ]; then
+  echo "Usage: deploy.sh <skill-name|--all> [source-dir]" >&2
+  exit 1
+fi
 
 # Vérifier que le skill existe
 if [ ! -f "$SOURCE_DIR/$SKILL_NAME/SKILL.md" ]; then
