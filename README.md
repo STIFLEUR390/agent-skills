@@ -68,6 +68,13 @@ npx skills add STIFLEUR390/agent-skills --skill project-definer -a claude-code
 |-------|-------------|-------|
 | [searxng-mcp](skills/searxng-mcp/) | Recherche web, news, images, vidéos et extraction de page via le MCP `@aplix39/searxng-mcp` : paramètres, contrat de sortie, erreurs 403/429 | Donner une recherche web sourcée à un agent |
 
+### Audio & voix
+
+| Skill | Description | Usage |
+|-------|-------------|-------|
+| [piper-tts](skills/piper-tts/) | Synthèse vocale locale fr/en avec Piper : normalisation des nombres, dates, sigles et anglicismes, lexiques de prononciation, injection IPA `[[ ]]`, vérification des phonèmes | Générer une voix off, une narration ou un WAV |
+| [piper-voices](skills/piper-voices/) | Installer et vérifier les voix ONNX de Piper (md5, réparation d'un modèle tronqué, multi-locuteurs, licences) | Télécharger une voix fr/en ou réparer un modèle |
+
 ### Monitoring
 
 | Skill | Description | Usage |
@@ -119,6 +126,8 @@ skills/
 ├── nuxt-core/              # Nuxt fondamentaux
 ├── nuxt-ui/                # Nuxt UI
 ├── searxng-mcp/            # Recherche web via MCP
+├── piper-tts/              # Synthèse vocale locale fr/en
+├── piper-voices/           # Voix ONNX de Piper
 └── sentry/                 # Sentry monitoring
 ```
 

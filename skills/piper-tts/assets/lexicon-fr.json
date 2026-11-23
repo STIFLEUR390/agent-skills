@@ -48,15 +48,21 @@
     "nginx": "[[ɛndʒˈin ɛks]]",
     "build": "[[bild]]",
     "builds": "[[bild]]",
-    "IA": "i a",
-    "UI": "u i",
-    "UX": "u iks",
-    "GPU": "gé pé u",
+    "IA": "[[i a]]",
+    "UI": "[[y i]]",
+    "UX": "[[y iks]]",
+    "GPU": "[[ʒe pe y]]",
     "OpenAI": "[[ɔpɛn eˈaj]]",
     "ChatGPT": "[[ʃat ʒe pe te]]",
     "cuillère": "[[kɥijˈɛʁ]]",
     "cuillères": "[[kɥijˈɛʁ]]",
     "aiguille": "[[eɡɥˈij]]",
-    "aiguilles": "[[eɡɥˈij]]"
+    "aiguilles": "[[eɡɥˈij]]",
+    "IPv6": "[[i pe ve sis]]",
+    "Mo": "mégaoctets",
+    "Go": "gigaoctets",
+    "To": "téraoctets",
+    "Ko": "kilooctets",
+    "Mo/s": "mégaoctets par seconde"
   }
 }

@@ -34,6 +34,30 @@ EN_MONTHS = ("January February March April May June July August September Octobe
 FR_FRACTIONS = {"1/2": "un demi", "1/4": "un quart", "3/4": "trois quarts",
                 "1/3": "un tiers", "2/3": "deux tiers"}
 
+# Chiffres romains -> chiffres arabes : espeak lit « XIV » comme « quatorze
+# romain » et « XXe » comme du bruit ; « 14 » et « 20ème » sont lus correctement.
+ROMAN_VALUES = {"I": 1, "V": 5, "X": 10, "L": 50, "C": 100, "D": 500, "M": 1000}
+ROMAN_RE = re.compile(r"\b([IVXLCDM]{2,}|[IVXLCDM])([eè]me|ère|er|e|ᵉ|th|st|nd|rd)?\b")
+
+
+def roman_to_int(text: str) -> int | None:
+    total = 0
+    for i, char in enumerate(text):
+        value = ROMAN_VALUES[char]
+        following = ROMAN_VALUES[text[i + 1]] if i + 1 < len(text) else 0
+        total += -value if value < following else value
+    return total
+
+
+def roman_rules(match: re.Match) -> str:
+    digits, suffix = match[1], match[2]
+    if len(digits) == 1:
+        return match[0]   # "Le" (L + e), "Ce", "De" ne sont pas des chiffres
+    value = roman_to_int(digits)
+    if value is None or value > 100:      # borne : évite MIX (1009), DIX (509)…
+        return match[0]
+    return f"{value}" + ("ère" if suffix == "ère" else "ème" if suffix else "")
+
 CHECK_CODE = r"""
 import json, sys
 from piper import PiperVoice
@@ -56,7 +80,7 @@ def _fr_date(day: str, month: str, year: str | None = None) -> str | None:
         return None
     d = int(day)
     jour = "1er" if d == 1 else str(d)
-    return f"le {jour} {FR_MONTHS[m - 1]}" + (f" {year}" if year else "")
+    return f"{jour} {FR_MONTHS[m - 1]}" + (f" {year}" if year else "")
 
 
 def _en_ordinal(n: int) -> str:
@@ -73,6 +97,7 @@ def _en_date(day: str, month: str, year: str | None = None) -> str | None:
 
 
 def fr_rules(t: str) -> str:
+    t = ROMAN_RE.sub(roman_rules, t)
     t = t.replace("\u00a0", " ").replace("\u202f", " ")
     t = t.replace("’", "'").replace("«", "").replace("»", "")
     t = t.replace("“", "").replace("”", "")
@@ -89,6 +114,7 @@ def fr_rules(t: str) -> str:
     t = re.sub(r"\b2nd\b", "second", t)
     t = re.sub(r"\b(\d+)\s*e\b", r"\1ème", t)          # 2e -> 2ème -> "deuzième"
     t = re.sub(r"(?<=\d)\.(?=\d)", ",", t)             # 3.14 -> 3,14
+    t = re.sub(r"(\d+),(\d{2})\s*€", r"\1 euros \2", t)   # 12,50 € -> 12 euros 50
     t = re.sub(r"(\d+)\s*€", r"\1 euros", t)
     t = t.replace("€", "euros")
     t = re.sub(r"(\d+)\s*%", r"\1 pour cent", t)
@@ -100,6 +126,8 @@ def fr_rules(t: str) -> str:
 
 
 def en_rules(t: str) -> str:
+    t = re.sub(r"\b([IVXLCDM]{2,})([a-z]{1,2})?\b",
+               lambda m: str(roman_to_int(m[1])) if (roman_to_int(m[1]) or 999) <= 100 else m[0], t)
     t = t.replace("\u00a0", " ").replace("\u202f", " ")
     t = t.replace("’", "'")
     for src in ("«", "»", "“", "”"):
@@ -236,11 +264,12 @@ def self_test() -> int:
         ("fr", "le 1er mai", "le premier mai"),
         ("fr", "n° 5", "numéro 5"),
         ("fr", "5 €", "5 euros"),
+        ("fr", "12,50 €", "12 euros 50"),
         ("fr", "50 %", "50 pour cent"),
         ("fr", "3.14", "3,14"),
         ("fr", "3/4", "trois quarts"),
-        ("fr", "01/02/2025", "le premier février 2025"),
-        ("fr", "2025-02-01", "le premier février 2025"),
+        ("fr", "01/02/2025", "premier février 2025"),
+        ("fr", "2025-02-01", "premier février 2025"),
         ("fr", "R&D", "R et D"),
         ("fr", "le week-end", "le [[wikˈɛnd]]"),
         ("fr", "un WC", "un [[vesˈe]]"),
@@ -252,6 +281,10 @@ def self_test() -> int:
         ("en", "50%", "50 percent"),
         ("en", "2025-02-01", "1st February 2025"),
         ("en", "R&D", "R and D"),
+        ("en", "Henry VIII", "Henry 8"),
+        ("fr", "le XXe siècle", "le 20ème siècle"),
+        ("fr", "Le chat dort", "Le chat dort"),
+        ("fr", "une IA", "une [[i a]]"),
     ]
     failures = 0
     for lang, src, expected in cases:
