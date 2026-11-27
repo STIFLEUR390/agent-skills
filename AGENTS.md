@@ -12,6 +12,24 @@ Dépôt de skills multi-agents pour Claude Code, Codex, OpenCode, Pi et omp.
 | `dokploy-deploy` | Déploiement prod Dokploy : compose, Dockerfile, GitHub, domaines, rollback, durcissement | Déployer sur Dokploy |
 | `searxng-mcp` | Recherche web, news, images, vidéos, extraction de page via le MCP `@aplix39/searxng-mcp` | Donner une recherche web sourcée à un agent |
 
+## Skills design
+
+| Skill | Description | Usage |
+|-------|-------------|-------|
+| `anti-slop` | Audit + réparation d'une UI qui « fait IA » : 9 passes ordonnées, valeurs exactes, états, responsive, captures multi-largeurs | Corriger ou relire une interface |
+| `design-motion` | Motion d'interface : durées, easing, chorégraphie, reduced-motion, anti-slop motion | Animer ou corriger une animation |
+
+Vérification visuelle par capture CDP (`scripts/shot.mjs`), sans Playwright ni Chrome système,
+avec **chrome-headless-shell** (Chrome for Testing). Installation une fois par machine :
+
+```bash
+bash skills/anti-slop/scripts/install-browser.sh
+```
+
+Version épinglée (158.0.8127.88), installée dans `~/.local/share/chrome-headless-shell`, wrapper
+`chrome-headless-shell` dans `~/.local/bin`. Variables : `CHS_HOME`, `BIN_DIR`. Le script est
+idempotent ; `shot.mjs` accepte `--bin`, `BROWSER_BIN` et `CDP_URL`.
+
 ## Skills Laravel 13
 
 | Skill | Description | Usage |

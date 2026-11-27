@@ -18,6 +18,14 @@
       ]
     },
     {
+      "title": "Design & UI",
+      "description": "Skills for auditing and repairing AI-looking interfaces, and for interface motion.",
+      "skills": [
+        "anti-slop",
+        "design-motion"
+      ]
+    },
+    {
       "title": "Web & Research",
       "description": "Skills for giving agents sourced web search and page reading.",
       "skills": [

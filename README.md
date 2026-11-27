@@ -28,6 +28,20 @@ npx skills add STIFLEUR390/agent-skills --skill project-definer -a claude-code
 | [skill-creator](skills/skill-creator/) | Créer un nouveau skill agent multi-plateforme | Ajouter un skill au repo |
 | [skill-health-checker](skills/skill-health-checker/) | Auditer tous les skills installés | Vérifier l'état de santé des skills |
 
+### Design & UI
+
+| Skill | Description | Usage |
+|-------|-------------|-------|
+| [anti-slop](skills/anti-slop/) | Audit et réparation d'une interface qui « fait IA » : friction, véracité, plancher web, 9 passes, valeurs exactes, états, responsive, captures multi-largeurs | Corriger ou relire une interface |
+| [design-motion](skills/design-motion/) | Motion d'interface : durées, easing, chorégraphie, reduced-motion, anti-slop motion | Animer ou corriger une animation |
+
+Les deux utilisent **chrome-headless-shell** pour la vérification visuelle (rendu Chrome exact,
+sans Chrome système). Installation une fois par machine :
+
+```bash
+bash skills/anti-slop/scripts/install-browser.sh
+```
+
 ### Laravel 13
 
 | Skill | Description | Usage |
