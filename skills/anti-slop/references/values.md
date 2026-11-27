@@ -91,10 +91,8 @@ terre ~60).
 ## Vérification (captures)
 
 Un seul moteur : **chrome-headless-shell** (Chrome for Testing). Rendu Chrome
-exact, CDP, pas de Playwright, pas de Chrome système. Les navigateurs « maison »
-testés (Obscura, Lightpanda) ne peignent pas les mêmes pixels — Obscura ignore
-`box-shadow`, `filter` et `clip-path`, Lightpanda ne peint rien du tout : ils ne
-peuvent pas juger un écran.
+exact, CDP, pas de Playwright, pas de Chrome système : un moteur qui ne peint pas
+`box-shadow`, `filter` et `clip-path` ne peut pas juger un écran.
 
 ### Installation (une fois par machine)
 

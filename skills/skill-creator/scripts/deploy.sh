@@ -5,6 +5,11 @@ set -euo pipefail
 SKILL_NAME="${1:-}"
 SOURCE_DIR="${2:-.}"
 
+# Depuis la racine du dépôt, les skills vivent dans ./skills.
+if [ "$SOURCE_DIR" = "." ] && [ -d "./skills" ]; then
+  SOURCE_DIR="skills"
+fi
+
 # --all : déploie tous les skills du répertoire source
 if [ "$SKILL_NAME" = "--all" ]; then
   for d in "$SOURCE_DIR"/*/; do
